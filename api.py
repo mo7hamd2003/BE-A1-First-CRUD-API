@@ -10,7 +10,7 @@ tasks = [
 ]
 
 class Task(BaseModel):
-    id: int
+    id: int | None = None
     title: str
     done: bool | None = None
 
@@ -48,9 +48,21 @@ def read_endpoint():
 def health():
     return {"status": "ok"}
 
-# Stage-2: Read list and single task
+# Stage-6: stats
+@app.get("/tasks/stats")
+def read_stats():
+    total = len(tasks)
+    done = sum(t["done"] for t in tasks)
+    open = total - done
+    return { "total": total, "done": done, "open": open }
+
+# Stage-2 & 6: Read list and single task (added query & filter parameters)
 @app.get("/tasks")
-def read_list():
+def read_list(search: str | None = None, done: bool | None = None):
+    if search:
+        return [t for t in tasks if search.lower() in t["title"].lower()]
+    if done is not None:
+        return [t for t in tasks if t["done"] == done]
     return tasks
 
 @app.get("/tasks/{task_id}")
@@ -61,7 +73,7 @@ def read_item(task_id: int):
     return {"task": task}
 
 # Stage-3: Post a new task
-@app.post("/tasks")
+@app.post("/tasks", status_code=201)
 async def create_task(task: Task):
     task.id = max((t["id"] for t in tasks), default=0) + 1
     task.done = False
@@ -79,10 +91,9 @@ async def update_task(task_id: int, updates: TaskUpdate):
     tasks[tasks.index(existing)] = updated
     return updated
 
-@app.delete("/tasks/{task_id}")
+@app.delete("/tasks/{task_id}", status_code=204)
 async def delete_task(task_id: int):
     existing = next((t for t in tasks if t["id"] == task_id), None)
     if existing is None:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
     tasks.remove(existing)
-    return {"status_code": 200, "detail": "Deleted successfully"}
