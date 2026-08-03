@@ -18,7 +18,13 @@ def get_db():
         con.close()
 
 def task_from_row(row):
-    return {"id": row["id"], "title": row["title"], "done": bool(row["done"])}
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "done": bool(row["done"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
 
 # DB-Stage-0: Create sqlite database
 # Never duplicates, idempotent only
@@ -28,7 +34,9 @@ def seed_db():
             """CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY,
                 title TEXT NOT NULL,
-                done BOOLEAN NOT NULL DEFAULT FALSE
+                done BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )"""
         )
         (count,) = con.execute("SELECT COUNT(*) FROM tasks").fetchone()
@@ -54,6 +62,8 @@ class Task(BaseModel):
     id: int | None = None
     title: str
     done: bool | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
     @field_validator("title")
     @classmethod
@@ -106,22 +116,22 @@ def read_list(
 ):
     if search:
         rows = con.execute(
-            "SELECT id, title, done FROM tasks WHERE title LIKE ? ORDER BY id",
+            "SELECT id, title, done, created_at, updated_at FROM tasks WHERE title LIKE ? ORDER BY id",
             (f"%{search}%",),
         ).fetchall()
     elif done is not None:
         rows = con.execute(
-            "SELECT id, title, done FROM tasks WHERE done = ? ORDER BY id",
+            "SELECT id, title, done, created_at, updated_at FROM tasks WHERE done = ? ORDER BY id",
             (int(done),),
         ).fetchall()
     else:
-        rows = con.execute("SELECT id, title, done FROM tasks ORDER BY id").fetchall()
+        rows = con.execute("SELECT id, title, done, created_at, updated_at FROM tasks ORDER BY id").fetchall()
     return [task_from_row(row) for row in rows]
 
 @app.get("/tasks/{task_id}")
 def read_item(task_id: int, con: sqlite3.Connection = Depends(get_db)):
     row = con.execute(
-        "SELECT id, title, done FROM tasks WHERE id = ?", (task_id,)
+        "SELECT id, title, done, created_at, updated_at FROM tasks WHERE id = ?", (task_id,)
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
@@ -144,18 +154,18 @@ def update_task(
     con: sqlite3.Connection = Depends(get_db),
 ):
     row = con.execute(
-        "SELECT id, title, done FROM tasks WHERE id = ?", (task_id,)
+        "SELECT id, title, done, created_at, updated_at FROM tasks WHERE id = ?", (task_id,)
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
     data = updates.model_dump(exclude_unset=True)
     if "title" in data:
-        con.execute("UPDATE tasks SET title = ? WHERE id = ?", (data["title"], task_id))
+        con.execute("UPDATE tasks SET title = ?, updated_at = datetime('now') WHERE id = ?", (data["title"], task_id))
     if "done" in data:
-        con.execute("UPDATE tasks SET done = ? WHERE id = ?", (1 if data["done"] else 0, task_id))
+        con.execute("UPDATE tasks SET done = ?, updated_at = datetime('now') WHERE id = ?", (1 if data["done"] else 0, task_id))
     con.commit()
     updated = con.execute(
-        "SELECT id, title, done FROM tasks WHERE id = ?", (task_id,)
+        "SELECT id, title, done, created_at, updated_at FROM tasks WHERE id = ?", (task_id,)
     ).fetchone()
     return task_from_row(updated)
 
