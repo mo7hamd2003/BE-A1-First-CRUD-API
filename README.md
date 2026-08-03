@@ -54,7 +54,7 @@ content-type: application/json
 
 ## Swagger UI
 
-![FastAPI Swagger UI](FastAPI - Swagger UI.png)
+![Swagger UI](https://github.con/mo7hamd2003/BE-A1-First-CRUD-API/FastAPI - Swagger UI.png)
 
 ## Query & Filter Options
 
