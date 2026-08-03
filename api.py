@@ -1,7 +1,34 @@
+import sqlite3
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, field_validator
 
 app = FastAPI()
+
+DB_PATH = "task.db"
+
+# Never duplicates, idempotent only
+def seed_db():
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            """CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY,
+                title TEXT NOT NULL,
+                done BOOLEAN NOT NULL DEFAULT FALSE
+            )"""
+        )
+        (count,) = con.execute("SELECT COUNT(*) FROM tasks").fetchone()
+        if count == 0:
+            con.executemany(
+                "INSERT INTO tasks (id, title, done) VALUES (?, ?, ?)",
+                [
+                    (1, "Buy groceries", 0),
+                    (2, "Walk the dog", 1),
+                    (3, "Write API docs", 0),
+                ],
+            )
+
+seed_db()
 
 tasks = [
     {"id": 1, "title": "Buy groceries", "done": False},
