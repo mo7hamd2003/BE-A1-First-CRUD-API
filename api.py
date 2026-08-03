@@ -21,6 +21,19 @@ class Task(BaseModel):
             raise ValueError("Title is required")
         return v.strip()
 
+class TaskUpdate(BaseModel):
+    title: str | None = None
+    done: bool | None = None
+
+    @field_validator("title")
+    @classmethod
+    def title_not_empty(cls, v):
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Title is required")
+        return v.strip()
+
 # # Stage-0: Hello, server
 # @app.get("/")
 # def read_root():
@@ -54,3 +67,22 @@ async def create_task(task: Task):
     task.done = False
     tasks.append(task.model_dump())
     return {"status_code": 201, "detail": "Created successfully"}
+
+# Stage-4: Update a task
+@app.put("/tasks/{task_id}", response_model=Task)
+async def update_task(task_id: int, updates: TaskUpdate):
+    existing = next((t for t in tasks if t["id"] == task_id), None)
+    if existing is None:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    updated = {**existing, **updates.model_dump(exclude_unset=True)}
+    updated["id"] = task_id
+    tasks[tasks.index(existing)] = updated
+    return updated
+
+@app.delete("/tasks/{task_id}")
+async def delete_task(task_id: int):
+    existing = next((t for t in tasks if t["id"] == task_id), None)
+    if existing is None:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    tasks.remove(existing)
+    return {"status_code": 200, "detail": "Deleted successfully"}
