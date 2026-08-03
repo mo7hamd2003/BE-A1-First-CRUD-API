@@ -1,8 +1,9 @@
 # Task API
 
-A simple REST API for managing a to-do list, built with **FastAPI** and **Pydantic**.
+A simple REST API for managing a to-do list, built with **FastAPI**, **Pydantic**, and **SQLite**.
 
-- Tasks live in an in-memory list, so they reset every time the server restarts
+- Tasks are stored in a SQLite database and persist across server restarts
+- The database file and table are created automatically on first run — no manual setup
 - Full CRUD: create, read, update, and delete tasks
 - Filter tasks by search text and completion status
 - Interactive API docs (Swagger UI) served automatically at `/docs`
@@ -22,6 +23,53 @@ python -m venv .venv && .venv/Scripts/pip install fastapi uvicorn && .venv/Scrip
 > On macOS/Linux, use `.venv/bin/pip` and `.venv/bin/python` instead of `.venv/Scripts/...`.
 
 The server starts on `http://localhost:8000`. Open `http://localhost:8000/docs` for the Swagger UI, which lets you try every endpoint from the browser.
+
+**Checkpoint — zero-setup clone:** on startup, `api.py` automatically creates the SQLite database (`task.db`) and its `tasks` table if they don't exist, and seeds it with 3 example tasks if the table is empty. Cloning the repository and running the one command above is all it takes — there are no manual database steps.
+
+## Database
+
+### Why SQLite?
+
+- **Zero setup** — `sqlite3` is part of Python's standard library: no database server to install, configure, or keep running.
+- **Single-file storage** — the whole database is one `task.db` file, trivial to back up, copy, or inspect with any SQLite tool.
+- **Right-sized** — a to-do list doesn't need a full database server; SQLite is transactional (ACID) and more than fast enough for this workload.
+- **Portable** — the same file works on Windows, macOS, and Linux.
+
+### Where the database file is stored
+
+- **Default location:** `task.db` in the project root, next to `api.py`.
+- **Overridable** via the `Task_DB_PATH` environment variable — the test suite uses this to run against a throwaway database so your real one is never touched.
+- **Auto-creation:** the schema in `schema.sql` is also embedded in `api.py`'s `seed_db()` function, which runs at startup. It creates the table if missing and inserts the 3 example tasks if the table is empty — idempotent, so restarts never duplicate rows.
+
+### Schema
+
+```sql
+CREATE TABLE tasks (
+    id INTEGER PRIMARY KEY,                -- auto-incrementing id
+    title TEXT NOT NULL,                   -- task description
+    done BOOLEAN NOT NULL DEFAULT FALSE    -- stored as 0/1
+);
+```
+
+### Database viewer
+
+![SQLite Browser](SQLite_Browser.png)
+
+### Example query
+
+Run against `task.db` with any SQLite client (like the browser above) or Python:
+
+```sql
+-- List all tasks that are still open
+SELECT id, title, done FROM tasks WHERE done = 0;
+```
+
+Result:
+
+| id  | title          | done |
+| --- | -------------- | ---- |
+| 1   | Buy groceries  | 0    |
+| 3   | Write API docs | 0    |
 
 ## Endpoints
 
